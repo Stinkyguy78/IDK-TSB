@@ -1,0 +1,198 @@
+local LP = game:GetService("Players").LocalPlayer
+local mouse = LP:GetMouse()
+local v3 = Vector3.new
+local color_green = Color3.new(1, 1, 1)
+local color_red = Color3.new(0, 0, 0)
+
+local target_key = 0x43 -- C
+local range = 17
+local F_KEY = 0x46
+
+-- BLOCK TIMING SETTING
+local MAX_BLOCK_TIME = 0.25 -- Time in seconds before forcing release (lower = faster release)
+local block_start_time = 0.25
+
+local target_player = nil
+local blocking = false
+local last_c = false
+local live_folder = workspace:FindFirstChild("Live")
+local list_cache = {}
+local last_cache_tick = 0
+
+local range_sq = range * range
+
+local segs = 16
+local circle_lines = {}
+for i = 1, segs do
+    local l = Drawing.new("Line")
+    l.Thickness = 1
+    l.Visible = false
+    circle_lines[i] = l
+end
+
+local enemy_label = Drawing.new("Text")
+enemy_label.Text = "Enemy"
+enemy_label.Outline = true
+enemy_label.Center = true
+enemy_label.Size = 14
+enemy_label.Color = color_red
+enemy_label.Visible = false
+
+local function setblock(state)
+    if state == blocking then return end
+    blocking = state
+    if state then keypress(F_KEY) else keyrelease(F_KEY) end
+end
+
+local function get_closest_to_cursor()
+    local closest = nil
+    local dist_sq = 40000
+    local mx = mouse.X
+    local my = mouse.Y
+
+    local now = tick()
+    if now - last_cache_tick > 0.25 then
+        list_cache = live_folder and live_folder:GetChildren() or {}
+        last_cache_tick = now
+    end
+
+    local my_char = LP.Character
+    for i = 1, #list_cache do
+        local p = list_cache[i]
+        if p == my_char then continue end
+        if p.Name == LP.Name then continue end
+        local hrp = p:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local s_pos, on_screen = WorldToScreen(hrp.Position)
+            if on_screen then
+                local dx = s_pos.X - mx
+                local dy = s_pos.Y - my
+                local d_sq = dx*dx + dy*dy
+                if d_sq < dist_sq then
+                    dist_sq = d_sq
+                    closest = p
+                end
+            end
+        end
+    end
+    return closest
+end
+
+local step = 6.283185307179586 / segs
+local function draw_visuals(my_root, t_root)
+    local col = target_player and color_green or color_red
+    local cp_x = my_root.Position.X
+    local cp_y = my_root.Position.Y - 3
+    local cp_z = my_root.Position.Z
+
+    local pts = {}
+    local vis = {}
+    for i = 0, segs do
+        local ang = i * step
+        local wpos = v3(cp_x + math.cos(ang) * range, cp_y, cp_z + math.sin(ang) * range)
+        local sp, v = WorldToScreen(wpos)
+        pts[i] = sp
+        vis[i] = v
+    end
+
+    for i = 1, segs do
+        local l = circle_lines[i]
+        if vis[i-1] and vis[i] then
+            l.From = Vector2.new(pts[i-1].X, pts[i-1].Y)
+            l.To = Vector2.new(pts[i].X, pts[i].Y)
+            l.Color = col
+            l.Visible = true
+        else
+            l.Visible = false
+        end
+    end
+
+    if target_player and t_root then
+        local t_pos, on_screen = WorldToScreen(t_root.Position + v3(0, 4, 0))
+        if on_screen then
+            enemy_label.Position = Vector2.new(t_pos.X, t_pos.Y)
+            enemy_label.Visible = true
+        else
+            enemy_label.Visible = false
+        end
+    else
+        enemy_label.Visible = false
+    end
+end
+
+task.spawn(function()
+    while true do
+        task.wait()
+
+        local char = LP.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root or not target_player or not target_player.Parent then
+            setblock(false)
+            block_start_time = 0
+            continue
+        end
+
+        local t_root = target_player:FindFirstChild("HumanoidRootPart")
+        if not t_root then
+            setblock(false)
+            block_start_time = 0
+            continue
+        end
+
+        local t_m1      = target_player:FindFirstChild("M1ing")
+        local t_noblock = target_player:FindFirstChild("NoBlock")
+
+        if t_m1 or t_noblock then
+            local dp = t_root.Position - root.Position
+            if dp.X*dp.X + dp.Y*dp.Y + dp.Z*dp.Z <= range_sq then
+                if blocking then
+                    -- Force release if held past the MAX_BLOCK_TIME limit
+                    if (tick() - block_start_time) >= MAX_BLOCK_TIME then
+                        setblock(false)
+                    end
+                else
+                    -- Start a fresh block and record the start time
+                    block_start_time = tick()
+                    setblock(true)
+                end
+            else
+                setblock(false)
+                block_start_time = 0
+            end
+        else
+            setblock(false)
+            block_start_time = 0
+        end
+    end
+end)
+
+while true do
+    task.wait(0.01)
+
+    local c_now = iskeypressed(target_key)
+    if c_now and not last_c then
+        if target_player then
+            target_player = nil
+            setblock(false)
+        else
+            target_player = get_closest_to_cursor()
+        end
+    end
+    last_c = c_now
+
+    local char = LP.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then
+        setblock(false)
+        target_player = nil
+        for i = 1, segs do circle_lines[i].Visible = false end
+        enemy_label.Visible = false
+        continue
+    end
+
+    local t_root = target_player and target_player.Parent
+        and target_player:FindFirstChild("HumanoidRootPart")
+        or nil
+
+    draw_visuals(root, t_root)
+end
