@@ -11,6 +11,7 @@ local F_KEY = 0x46
 -- BLOCK TIMING SETTING
 local MAX_BLOCK_TIME = 0.15 -- Time in seconds before forcing release (lower = faster release)
 local block_start_time = 0
+local has_blocked_current_m1 = false
 
 local target_player = nil
 local blocking = false
@@ -129,6 +130,7 @@ task.spawn(function()
         if not root or not target_player or not target_player.Parent then
             setblock(false)
             block_start_time = 0
+            has_blocked_current_m1 = false
             continue
         end
 
@@ -136,6 +138,7 @@ task.spawn(function()
         if not t_root then
             setblock(false)
             block_start_time = 0
+            has_blocked_current_m1 = false
             continue
         end
 
@@ -151,17 +154,23 @@ task.spawn(function()
                         setblock(false)
                     end
                 else
-                    -- Start a fresh block and record the start time
-                    block_start_time = tick()
-                    setblock(true)
+                    -- Only block if we haven't already blocked this specific M1 swing
+                    if not has_blocked_current_m1 then
+                        block_start_time = tick()
+                        setblock(true)
+                        has_blocked_current_m1 = true
+                    end
                 end
             else
                 setblock(false)
                 block_start_time = 0
+                has_blocked_current_m1 = false
             end
         else
+            -- Enemy stopped M1ing, reset everything for the next swing
             setblock(false)
             block_start_time = 0
+            has_blocked_current_m1 = false
         end
     end
 end)
