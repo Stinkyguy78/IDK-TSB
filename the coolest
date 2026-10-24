@@ -51,7 +51,7 @@ local function get_closest_to_cursor()
     local my = mouse.Y
 
     local now = tick()
-    if now - last_cache_tick > 1 then
+    if now - last_cache_tick > 0.25 then
         list_cache = live_folder and live_folder:GetChildren() or {}
         last_cache_tick = now
     end
