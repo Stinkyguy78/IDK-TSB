@@ -9,7 +9,7 @@ local range = 20
 local F_KEY = 0x46
 
 -- BLOCK TIMING SETTING
-local MAX_BLOCK_TIME = 0.20 -- Time in seconds before forcing release (lower = faster release)
+local MAX_BLOCK_TIME = 0.10 -- Time in seconds before forcing release (lower = faster release)
 local block_start_time = 0
 
 local target_player = nil
@@ -51,7 +51,7 @@ local function get_closest_to_cursor()
     local my = mouse.Y
 
     local now = tick()
-    if now - last_cache_tick > 0.5 then
+    if now - last_cache_tick > 1 then
         list_cache = live_folder and live_folder:GetChildren() or {}
         last_cache_tick = now
     end
