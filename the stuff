@@ -4,7 +4,7 @@ local v3 = Vector3.new
 local color_green = Color3.new(0, 1, 0)
 local color_red = Color3.new(1, 0, 0)
 
-local target_key = 0x05 -- Mouse Button
+local target_key = 0x43 -- C
 local range = 20
 local F_KEY = 0x46
 
